@@ -20,6 +20,7 @@ In the Falcon console: **Support and resources > Resources and tools > API clien
 
 ```shell
 export AWS_REGION="us-east-1"
+export FALCON_API_URL="https://api.crowdstrike.com"  # see API Base URLs by Region below
 
 export FALCON_CLIENT_ID=$(aws secretsmanager get-secret-value \
   --region "$AWS_REGION" \
