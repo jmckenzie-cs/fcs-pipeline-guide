@@ -50,7 +50,15 @@ export FALCON_CLIENT_SECRET=$(az keyvault secret show \
   --vault-name <YOUR_VAULT> --name fcs-client-secret --query value -o tsv)
 ```
 
-Once exported, the FCS CLI picks them up via environment variables — no per-developer config files needed.
+These credentials are used to authenticate to the CrowdStrike API for programmatic download (see Section 2). Once the FCS CLI binary is downloaded, it uses a separate set of environment variables at runtime:
+
+```shell
+export FALCON_FCS_CLIENT_ID="<YOUR_CLIENT_ID>"
+export FALCON_FCS_CLIENT_SECRET="<YOUR_CLIENT_SECRET>"
+export FALCON_FCS_FALCON_REGION="us-2"  # us-1 | us-2 | eu-1 | us-gov-1 | us-gov-2
+```
+
+Store and inject all of these from your secrets manager — no per-developer config files needed.
 
 ---
 
