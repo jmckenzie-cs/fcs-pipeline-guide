@@ -117,23 +117,56 @@ tar -xvzf fcs.tar.gz && chmod u+x fcs
 
 For maximum consistency across 100 teams, run FCS CLI **as a container** rather than a binary. No install or update management per developer.
 
+> **Note:** The FCS CLI container image is only available for `linux/arm64`. Authentication to the CrowdStrike registry is required before pulling — you cannot `docker pull` anonymously.
+
+### Step 1 — Authenticate to the CrowdStrike registry
+
+You only need to do this once per pipeline environment to obtain a registry password (the password can be reused across runs).
+
 ```shell
+# Get an OAuth token
+FALCON_ACCESS_TOKEN=$(curl -s --request POST \
+  --header "Content-Type: application/x-www-form-urlencoded" \
+  --data-urlencode "client_id=${FALCON_CLIENT_ID}" \
+  --data-urlencode "client_secret=${FALCON_CLIENT_SECRET}" \
+  --url "${FALCON_API_URL}/oauth2/token" | jq -r '.access_token')
+
+# Exchange it for a registry password
+CS_PASSWORD=$(curl -s --request GET \
+  --header "Authorization: Bearer ${FALCON_ACCESS_TOKEN}" \
+  --url "${FALCON_API_URL}/iac/entities/image-registry-credentials/v1" \
+  | jq -r '.resources.resources.token')
+
+# Log in — username is your CID prefixed with "fh-", checksum removed
+# e.g. CID 0123456789ABCDEFGHIJKLMNOPQRSTUV-WX → fh-0123456789ABCDEFGHIJKLMNOPQRSTUV
+echo "$CS_PASSWORD" | docker login "$CS_REGISTRY" --username "fh-<YOUR_CID>" --password-stdin
+```
+
+### Step 2 — Pull and run
+
+```shell
+export CS_REGISTRY=registry.crowdstrike.com          # see region table below
+export CS_IMAGE=${CS_REGISTRY}/fcs/us-1/release/cs-fcs
+export CS_IMAGE_TAG=2.2.0
+
+docker pull ${CS_IMAGE}:${CS_IMAGE_TAG}
+
 docker run --rm \
   -v /var/run/docker.sock:/var/run/docker.sock \
-  registry.crowdstrike.com/fcs/us-1/release/cs-fcs:2.2.0 scan image myapp:latest \
+  ${CS_IMAGE}:${CS_IMAGE_TAG} scan image myapp:latest \
   --client-id $FALCON_CLIENT_ID \
   --client-secret $FALCON_CLIENT_SECRET \
   --falcon-region us-1
 ```
 
-Credentials come from env vars — no per-developer config files needed. You control the version tag centrally.
+You control the version tag centrally — no per-developer installs needed.
 
 ### Scan for upload only (faster, no local output)
 
 ```shell
 docker run --rm \
   -v /var/run/docker.sock:/var/run/docker.sock \
-  registry.crowdstrike.com/fcs/us-1/release/cs-fcs:2.2.0 scan image myapp:latest \
+  ${CS_IMAGE}:${CS_IMAGE_TAG} scan image myapp:latest \
   --scan-only \
   --upload \
   --client-id $FALCON_CLIENT_ID \
