@@ -6,6 +6,7 @@
 |---|---|
 | This file | Centralizing credentials in a secrets manager and programmatic FCS CLI download |
 | [`token-vending-lambda/`](token-vending-lambda/README.md) | Token Vending Machine — teams get a short-lived bearer token without ever seeing the client secret |
+| [`fcs-cli-at-scale.md`](fcs-cli-at-scale.md) | Credential distribution patterns, pipeline integration, and container-based approach for 100+ developer teams |
 
 ---
 
