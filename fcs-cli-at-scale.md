@@ -53,7 +53,65 @@ export FALCON_CLIENT_SECRET=$(aws secretsmanager get-secret-value \
   --query SecretString --output text | jq -r '.client_secret')
 ```
 
-### Option C — Environment Variables
+### Option C — Token Vending Machine (recommended when secret exposure must be zero)
+
+For teams with strict requirements around secret access — where even pipeline-injected secrets are unacceptable — a Token Vending Machine (TVM) Lambda puts an API in front of CrowdStrike OAuth2. Callers receive only a short-lived bearer token; the client secret never leaves the Lambda execution environment.
+
+```
+Developer / Pipeline
+      |
+      | IAM (SSO session or OIDC-assumed role)
+      v
+Lambda: crowdstrike-fcs-token-vend
+      |
+      | Lambda execution role only
+      v
+Secrets Manager: crowdstrike/fcs-cli
+      |
+      v
+CrowdStrike OAuth2  →  short-lived token returned to caller
+```
+
+Callers invoke the Lambda with their AWS identity and receive a token they pass to `fcs` via `--falcon-token`:
+
+```shell
+# Local developer
+TOKEN=$(aws lambda invoke \
+  --function-name crowdstrike-fcs-token-vend \
+  --payload '{}' --output text --query Payload \
+  /dev/stdout | jq -r '.body | fromjson | .token')
+
+fcs scan image myapp:latest --falcon-token "$TOKEN" --falcon-region us-1
+```
+
+```yaml
+# GitHub Actions — OIDC assumes role, no secrets stored in GitHub
+- uses: aws-actions/configure-aws-credentials@v4
+  with:
+    role-to-assume: ${{ vars.FCS_SCAN_ROLE_ARN }}
+    aws-region: us-east-1
+
+- id: fcs-token
+  run: |
+    TOKEN=$(aws lambda invoke --function-name crowdstrike-fcs-token-vend \
+      --payload '{}' --output text --query Payload \
+      /dev/stdout | jq -r '.body | fromjson | .token')
+    echo "::add-mask::$TOKEN"
+    echo "token=$TOKEN" >> "$GITHUB_OUTPUT"
+
+- run: |
+    fcs scan image myapp:${{ github.sha }} \
+      --falcon-token ${{ steps.fcs-token.outputs.token }} \
+      --falcon-region us-1 --upload
+```
+
+Access control and audit are handled entirely by IAM — each team gets a role with `lambda:InvokeFunction` on the vending function, and every invocation is logged in CloudTrail.
+
+See [`token-vending-lambda/`](token-vending-lambda/README.md) for the full Lambda source, IAM policies, and deployment instructions.
+
+---
+
+### Option D — Environment Variables
 
 The FCS CLI accepts credentials via env vars — no config file needed per developer:
 
@@ -227,16 +285,19 @@ fi
 ## Recommended Architecture at Scale
 
 ```
-Secrets Manager / CI Platform Secrets
+Secrets Manager / Token Vending Lambda
          |
          v
   1 Shared API Client (scoped to image assessment)
          |
          v
+  Short-lived bearer token distributed per-run via IAM
+         |
+         v
   Shared Pipeline Template (used across all teams)
   ├── Auto-downloads FCS CLI binary or pulls container image
-  ├── Injects credentials via environment variables
-  ├── Runs fcs scan image <IMAGE>
+  ├── Fetches token from vending Lambda (no secret exposure)
+  ├── Runs fcs scan image <IMAGE> --falcon-token <TOKEN>
   ├── Checks exit code for go/no-go gate
   └── Uploads results to Falcon console (--upload flag)
          |
