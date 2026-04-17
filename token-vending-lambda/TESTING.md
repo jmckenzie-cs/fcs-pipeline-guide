@@ -17,6 +17,15 @@ All commands below assume you are running from the **root of the repo** (`fcs-pi
 cd path/to/fcs-pipeline-guide
 ```
 
+If running from **AWS CloudShell**, clone the repo first:
+
+```shell
+git clone https://github.com/jmckenzie-cs/fcs-cli-enterprise-setup.git
+cd fcs-cli-enterprise-setup
+```
+
+CloudShell has the AWS CLI, Python, and `jq` pre-installed — no additional setup needed.
+
 ---
 
 ## Step 1 — Get your AWS account ID
