@@ -11,6 +11,12 @@ Step-by-step instructions for deploying and validating the token vending Lambda 
 - CrowdStrike API client credentials (client ID and secret) — see the [API client scopes required](README.md#1-store-credentials-in-secrets-manager)
 - This repo checked out locally
 
+All commands below assume you are running from the **root of the repo** (`fcs-pipeline-guide/`). Run this first:
+
+```shell
+cd path/to/fcs-pipeline-guide
+```
+
 ---
 
 ## Step 1 — Get your AWS account ID
